@@ -239,8 +239,8 @@ def ddpg(
     max_episode_steps: int = 100_000,
     batch_size: int = 256,
     tau: float = 0.005,
-    actor_lr: float = 3e-4,
-    critic_lr: float = 3e-4,
+    actor_lr: float = 1e-4,
+    critic_lr: float = 1e-4,
     gamma: float = 0.99,
     exploration_anneal: int = 100_000,
     eval_interval: int = 5000,
@@ -327,7 +327,7 @@ def ddpg(
 
         if step % eval_interval == 0 or step == num_steps - 1:
             mean_return = evaluate_agent(
-                agent, test_env, eval_episodes, max_episode_steps, render=False,
+                agent, test_env, eval_episodes, max_episode_steps, render=True,
             )
             print(f"Mean Return After {step} Steps: {mean_return:.2f}")
             if mean_return > best_return:
@@ -372,6 +372,7 @@ def learn(
     critic_optimizer.zero_grad()
     # gradient descent step on critic network
     critic_loss.backward()
+    torch.nn.utils.clip_grad_norm_(agent.critic.parameters(), 10.0)
     critic_optimizer.step()
 
     ##################
@@ -385,6 +386,7 @@ def learn(
     actor_optimizer.zero_grad()
     # gradient descent step on actor network
     actor_loss.backward()
+    torch.nn.utils.clip_grad_norm_(agent.actor.parameters(), 10.0)
     actor_optimizer.step()
 
 
@@ -392,12 +394,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", type=str, default="reacher")
     parser.add_argument("--train_steps", type=int, default=50_000)
+    parser.add_argument("--name", type=str, default="ddpg_run")
     parser.add_argument("--max_episode_steps", type=int, default=100)
     args = parser.parse_args()
 
     if args.env == "reacher":
         train_env = ReacherEnv(render=False)
-        test_env = ReacherEnv(render=False)
+        test_env = ReacherEnv(render=True)
     else:
         train_env = gym.make(args.env)
         test_env = gym.make(args.env)
@@ -410,7 +413,7 @@ if __name__ == "__main__":
     agent = Agent(
         train_env.observation_space.shape[0],
         train_env.action_space.shape[0],
-        hidden_size=128,
+        hidden_size=256,
     )
 
     buffer = ReplayBuffer(
@@ -425,6 +428,7 @@ if __name__ == "__main__":
         test_env,
         buffer,
         num_steps=args.train_steps,
+        name=args.name,
         max_episode_steps=args.max_episode_steps,
         exploration_anneal=args.train_steps // 2,
     )
