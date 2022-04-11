@@ -139,7 +139,6 @@ class ReplayBuffer:
     def __init__(
         self, size: int, example_state: np.ndarray, example_action: np.ndarray
     ):
-        s_shape = example_state.shape
         self.s_stack = np.zeros(
             (size,) + example_state.shape, dtype=example_state.dtype
         )
@@ -393,12 +392,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", type=str, default="reacher")
     parser.add_argument("--train_steps", type=int, default=50_000)
-    parser.add_argument("--max_episode_steps", type=int, default=1000)
+    parser.add_argument("--max_episode_steps", type=int, default=100)
     args = parser.parse_args()
 
     if args.env == "reacher":
         train_env = ReacherEnv(render=False)
-        test_env = ReacherEnv(render=True)
+        test_env = ReacherEnv(render=False)
     else:
         train_env = gym.make(args.env)
         test_env = gym.make(args.env)
@@ -411,11 +410,11 @@ if __name__ == "__main__":
     agent = Agent(
         train_env.observation_space.shape[0],
         train_env.action_space.shape[0],
-        hidden_size=256,
+        hidden_size=128,
     )
 
     buffer = ReplayBuffer(
-        100_000,
+        min(args.train_steps, 100_000),
         example_state=train_env.reset(),
         example_action=train_env.action_space.sample(),
     )
@@ -427,7 +426,7 @@ if __name__ == "__main__":
         buffer,
         num_steps=args.train_steps,
         max_episode_steps=args.max_episode_steps,
-        exploration_anneal=args.train_steps,
+        exploration_anneal=args.train_steps // 2,
     )
 
     final_eval = evaluate_agent(
